@@ -1,4 +1,4 @@
-module github/maxidelgado/dynagraph
+module github.com/maxidelgado/dynagraph
 
 go 1.14
 
