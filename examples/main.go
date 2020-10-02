@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/maxidelgado/dynagraph"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/maxidelgado/dynagraph/client"
+	"github.com/maxidelgado/dynagraph/utils"
 )
 
 func main() {
-	sess := session.Must(session.NewSession(&aws.Config{Region: aws.String("us-east-1")}))
-	g := dynagraph.New(sess, dynagraph.Config{TableName: "SOME TABLE"})
+	sess := connectAWS("us-east-1")
+	db := dynamodb.New(sess)
+	c, _ := client.New(db, "yourTableName")
+	ctx := context.Background()
 
 	var err error
 
@@ -24,32 +29,32 @@ func main() {
 		Name:        "name",
 		Description: "description",
 	}
-	u.Id, err = g.Node().Put(u)
+	u.Id, err = c.Node(ctx).Put(u)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// create product
-	p.Id, err = g.Node().Put(p)
+	p.Id, err = c.Node(ctx).Put(p)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// create order tx
 	o := ExampleOrder{}
-	o.Id = dynagraph.NewId(o)
+	o.Id = utils.NewId(o)
 
-	inputs := dynagraph.WriteItemsInput{}
+	inputs := utils.WriteItemsInput{}
 	inputs, _ = inputs.AppendNode(o.Id, o)
 	inputs, _ = inputs.AppendEdge(o.Id, u)
 	inputs, _ = inputs.AppendEdge(o.Id, p)
-	err = g.Transaction().Put(inputs).Run()
+	err = c.Transaction(ctx).Put(inputs).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// update user
-	err = g.Node(u.Id).Update(ExampleUser{FirstName: "updated_first_name"})
+	err = c.Node(ctx, u.Id).Update(ExampleUser{FirstName: "updated_first_name"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,51 +64,63 @@ func main() {
 		Id   string
 		Type string
 	}
-	err = g.Query(dynagraph.Filter{Id: o.Id, Type: "edge"}).All(&edges)
+	err = c.Query(ctx, utils.Filter{Id: o.Id, Type: "edge"}).All(&edges)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// delete example by using transactions
-	keys := dynagraph.KeysInput{}
+	keys := utils.KeysInput{}
 	for _, edge := range edges {
-		keys = append(keys, dynagraph.Filter{Id: edge.Id, Type: edge.Type})
+		keys = append(keys, utils.Filter{Id: edge.Id, Type: edge.Type})
 	}
-	keys = keys.AppendKeys(dynagraph.Filter{Id: p.Id, Type: "node:exampleproduct"})
-	keys = keys.AppendKeys(dynagraph.Filter{Id: o.Id, Type: "prop:exampleorder"})
-	err = g.Transaction().Delete(keys).Run()
+	keys = keys.AppendKeys(utils.Filter{Id: p.Id, Type: "node:exampleproduct"})
+	keys = keys.AppendKeys(utils.Filter{Id: o.Id, Type: "prop:exampleorder"})
+	err = c.Transaction(ctx).Delete(keys).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 	// delete individual node
-	err = g.Node().Delete(dynagraph.Filter{Id: u.Id, Type: "node:exampleuser"})
+	err = c.Node(ctx).Delete(utils.Filter{Id: u.Id, Type: "node:exampleuser"})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	/*
-		u.Id, err = g.Node().Put(u)
-		u.Id, err = g.Node("1234").Put(u)
-		u.Id, err = g.Node("pisame_esta").Put(u)
+		u.Id, err = c.Node().Put(u)
+		u.Id, err = c.Node("1234").Put(u)
+		u.Id, err = c.Node("pisame_esta").Put(u)
 
-		err = g.Node("1234").Update(u)
-		err = g.Node().Update(u) // error
-		err = g.Node("").Update(u) // error
-		err = g.Node("no_existe").Update(u) // error
+		err = c.Node("1234").Update(u)
+		err = c.Node().Update(u) // error
+		err = c.Node("").Update(u) // error
+		err = c.Node("no_existe").Update(u) // error
 
-		err = g.Node(u.Id).Edge(p) // OK
-		err = g.Node("no_existe").Edge(p) // error
+		err = c.Node(u.Id).Edge(p) // OK
+		err = c.Node("no_existe").Edge(p) // error
 
-		err = g.Node(u.Id).Prop(p) // OK
-		err = g.Node("no_existe").Prop(p) // error
+		err = c.Node(u.Id).Prop(p) // OK
+		err = c.Node("no_existe").Prop(p) // error
 
-		err = g.Node(u.Id).Ref(p.Id) // OK
-		err = g.Node("no_existe").Ref(p.Id) // error
+		err = c.Node(u.Id).Ref(p.Id) // OK
+		err = c.Node("no_existe").Ref(p.Id) // error
 
-		err = g.Node().Delete(dynagraph.Filter{"1234", "untipo"}) // OK
-		err = g.Node().Delete(dynagraph.Filter{"1234", ""}) // error
-		err = g.Node().Delete(dynagraph.Filter{}) // error
+		err = c.Node().Delete(dynagraph.Filter{"1234", "untipo"}) // OK
+		err = c.Node().Delete(dynagraph.Filter{"1234", ""}) // error
+		err = c.Node().Delete(dynagraph.Filter{}) // error
 
-		err = g.Query(dynagraph.Filter{"1234", "untipo"}).One(&result)
+		err = c.Query(dynagraph.Filter{"1234", "untipo"}).One(&result)
 	*/
+}
+
+func connectAWS(region string) *session.Session {
+	sess, err := session.NewSession(
+		&aws.Config{
+			Region: aws.String(region),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	return sess
 }

@@ -1,4 +1,4 @@
-package dynagraph
+package utils
 
 import (
 	"fmt"
@@ -33,12 +33,12 @@ const (
 type WriteItemsInput []interface{}
 
 func (i WriteItemsInput) AppendNode(id string, value interface{}) (WriteItemsInput, error) {
-	nodeType := getNodeType(value)
+	nodeType := GetNodeType(value)
 	if id == "" {
 		id = fmt.Sprintf("%s-%s", nodeType, uuid.New().String())
 	}
 
-	edgeMap, err := buildPut(id, nodeType, value)
+	edgeMap, err := BuildPut(id, nodeType, value)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (i WriteItemsInput) AppendNode(id string, value interface{}) (WriteItemsInp
 }
 
 func (i WriteItemsInput) AppendEdge(id string, value interface{}) (WriteItemsInput, error) {
-	edgeMap, err := addEdge(id, value)
+	edgeMap, err := AddEdge(id, value)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (i WriteItemsInput) AppendEdge(id string, value interface{}) (WriteItemsInp
 }
 
 func (i WriteItemsInput) AppendProp(id string, value interface{}) (WriteItemsInput, error) {
-	propMap, err := addProp(id, value)
+	propMap, err := AddProp(id, value)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (i WriteItemsInput) AppendProp(id string, value interface{}) (WriteItemsInp
 }
 
 func (i WriteItemsInput) AppendRef(sourceId, targetId string) (WriteItemsInput, error) {
-	refMap, err := addRef(sourceId, targetId)
+	refMap, err := AddRef(sourceId, targetId)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +99,14 @@ func (k Filter) IndexKey() Index {
 
 func (k Filter) GetHashValue() (string, string) {
 	if k.Index == ByType {
-		return nodeType, k.Type
+		return NodeType, k.Type
 	}
-	return nodeId, k.Id
+	return NodeId, k.Id
 }
+
 func (k Filter) GetRangeValues() (string, dynamo.Operator, string) {
 	if k.Index == ByType {
-		return nodeId, dynamo.Operator(k.OperatorKey()), k.Id
+		return NodeId, dynamo.Operator(k.OperatorKey()), k.Id
 	}
-	return nodeType, dynamo.Operator(k.OperatorKey()), k.Type
+	return NodeType, dynamo.Operator(k.OperatorKey()), k.Type
 }
