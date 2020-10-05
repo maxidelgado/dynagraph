@@ -6,7 +6,7 @@ import (
 	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
 
 	"github.com/guregu/dynamo"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
 
 func New(ctx context.Context, t dynamoiface.Table) Query {

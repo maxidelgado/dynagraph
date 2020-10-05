@@ -6,7 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
 
 var (

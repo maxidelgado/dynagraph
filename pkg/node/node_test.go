@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
 
 type tMock struct {

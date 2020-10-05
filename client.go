@@ -1,15 +1,15 @@
-package client
+package dynagraph
 
 import (
 	"context"
 	"errors"
-	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-	"github.com/maxidelgado/dynagraph/internal/batch"
-	"github.com/maxidelgado/dynagraph/internal/node"
-	"github.com/maxidelgado/dynagraph/internal/query"
-	"github.com/maxidelgado/dynagraph/internal/transaction"
+	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
+	"github.com/maxidelgado/dynagraph/pkg/batch"
+	"github.com/maxidelgado/dynagraph/pkg/node"
+	"github.com/maxidelgado/dynagraph/pkg/query"
+	"github.com/maxidelgado/dynagraph/pkg/transaction"
 )
 
 var (

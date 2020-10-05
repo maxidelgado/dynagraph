@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/guregu/dynamo"
 	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
 
 type tMock struct {

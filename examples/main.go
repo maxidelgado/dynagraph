@@ -2,116 +2,90 @@ package main
 
 import (
 	"context"
-	"github.com/maxidelgado/dynagraph/internal/common"
-	"log"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/maxidelgado/dynagraph/client"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
 
+func init() {
+	os.Setenv("AWS_REGION", "us-east-1")
+	os.Setenv("AWS_PROFILE", "astrocode")
+}
+
+type A struct {
+	Id    string
+	Value string
+	B     B   `dynamo:"-"`
+	Cs    []C `dynamo:"-"`
+}
+
+type B struct {
+	Id    string
+	Value string
+}
+
+type C struct {
+	Id    string
+	Value string
+}
+
 func main() {
-	sess := connectAWS("us-east-1")
-	db := dynamodb.New(sess)
-	c, _ := client.New(db, "yourTableName")
-	ctx := context.Background()
+	var (
+		sess = connectAWS("us-east-1")
+		db   = dynamodb.New(sess)
+		c, _ = dynagraph.New(db, "astrocode")
+		ctx  = context.Background()
+	)
 
-	var err error
-
-	// create user
-	u := ExampleUser{
-		FirstName: "first_name",
-		LastName:  "last_name",
-		Address:   "address",
+	// setup nodes
+	nodeA := A{
+		Id:    "a:id",
+		Value: "some field value",
 	}
-	p := ExampleProduct{
-		Name:        "name",
-		Description: "description",
+	nodeB := B{
+		Id:    "b:id",
+		Value: "some field value",
 	}
-	u.Id, err = c.Node(ctx).Put(u)
-	if err != nil {
-		log.Fatal(err)
+	nodeC := C{
+		Id:    "c:id",
+		Value: "some field value",
 	}
+	nodeA.B = nodeB
+	nodeA.Cs = append(nodeA.Cs, nodeC)
 
-	// create product
-	p.Id, err = c.Node(ctx).Put(p)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// create source node A
+	c.Node(ctx, nodeA.Id).Put(nodeA)
 
-	// create order tx
-	o := ExampleOrder{}
-	o.Id = common.Id(o)
+	// create child node B (one to one)
+	c.Node(ctx, nodeA.Id).Prop(nodeB)
 
-	inputs := utils.Operations{}
-	inputs, _ = inputs.AppendNode(o.Id, o)
-	inputs, _ = inputs.AppendEdge(o.Id, u)
-	inputs, _ = inputs.AppendEdge(o.Id, p)
-	err = c.Transaction(ctx).Put(inputs).Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// create nodeA <-> nodeC edge (one/many to many)
+	c.Node(ctx, nodeA.Id).Edge(nodeC)
 
-	// update user
-	err = c.Node(ctx, u.Id).Update(ExampleUser{FirstName: "updated_first_name"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	// update node A
+	c.Node(ctx, nodeA.Id).Update(A{Value: "updated value"})
 
-	// get order edges
-	var edges []struct {
-		Id   string
-		Type string
-	}
-	err = c.Query(ctx).All(utils.Query{ID: utils.ID{Id: o.Id, Type: "edge"}}, &edges)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// get nodeA
+	var resultNodeA A
+	c.Query(ctx).One(utils.ID{Id: nodeA.Id, Type: "node:a"}, &resultNodeA)
 
-	// delete example by using transactions
-	keys := utils.IDs{}
-	for _, edge := range edges {
-		keys = append(keys, utils.ID{Id: edge.Id, Type: edge.Type})
-	}
-	keys = keys.AppendKeys(utils.ID{Id: p.Id, Type: "node:exampleproduct"})
-	keys = keys.AppendKeys(utils.ID{Id: o.Id, Type: "prop:exampleorder"})
-	err = c.Transaction(ctx).Delete(keys).Run()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// delete individual node
-	err = c.Node(ctx).Delete(utils.ID{Id: u.Id, Type: "node:exampleuser"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	// get nodeA property B
+	c.Query(ctx).One(utils.ID{Id: nodeA.Id, Type: "prop:b"}, &resultNodeA.B)
 
-	/*
-		u.Id, err = c.Node().Put(u)
-		u.Id, err = c.Node("1234").Put(u)
-		u.Id, err = c.Node("pisame_esta").Put(u)
+	// get nodeA edges
+	c.Query(ctx).All(utils.Query{ID: utils.ID{Id: nodeA.Id, Type: "edge"}}, &resultNodeA.Cs)
 
-		err = c.Node("1234").Update(u)
-		err = c.Node().Update(u) // error
-		err = c.Node("").Update(u) // error
-		err = c.Node("no_existe").Update(u) // error
-
-		err = c.Node(u.Id).Edge(p) // OK
-		err = c.Node("no_existe").Edge(p) // error
-
-		err = c.Node(u.Id).Prop(p) // OK
-		err = c.Node("no_existe").Prop(p) // error
-
-		err = c.Node(u.Id).Ref(p.Id) // OK
-		err = c.Node("no_existe").Ref(p.Id) // error
-
-		err = c.Node().Delete(dynagraph.Query{"1234", "untipo"}) // OK
-		err = c.Node().Delete(dynagraph.Query{"1234", ""}) // error
-		err = c.Node().Delete(dynagraph.Query{}) // error
-
-		err = c.Query(dynagraph.Query{"1234", "untipo"}).One(&result)
-	*/
+	// delete nodes
+	nodeId := utils.ID{Id: nodeA.Id, Type: "node:a"}
+	propId := utils.ID{Id: nodeA.Id, Type: "prop:b"}
+	edgeId := utils.ID{Id: nodeA.Id, Type: "edge:c:id"}
+	c.Node(ctx).Delete(nodeId)
+	c.Node(ctx).Delete(propId)
+	c.Node(ctx).Delete(edgeId)
 }
 
 func connectAWS(region string) *session.Session {

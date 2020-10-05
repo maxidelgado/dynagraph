@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
-	"github.com/maxidelgado/dynagraph/utils"
+	"github.com/maxidelgado/dynagraph/pkg/utils"
 	"reflect"
 	"testing"
 )
