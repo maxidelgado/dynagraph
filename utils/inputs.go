@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"fmt"
+	"github.com/maxidelgado/dynagraph/internal/common"
 
 	"github.com/google/uuid"
 	"github.com/guregu/dynamo"
@@ -27,86 +27,91 @@ type Index string
 
 const (
 	Default Index = "default"
-	ByType  Index = "ByType"
+	ByType  Index = "by type"
 )
 
-type WriteItemsInput []interface{}
+type Operations []interface{}
 
-func (i WriteItemsInput) AppendNode(id string, value interface{}) (WriteItemsInput, error) {
-	nodeType := GetNodeType(value)
+func (i Operations) AppendNode(id string, value interface{}) (Operations, error) {
+	nodeType := common.Type(value)
 	if id == "" {
-		id = fmt.Sprintf("%s-%s", nodeType, uuid.New().String())
+		id = nodeType + "-" + uuid.New().String()
 	}
 
-	edgeMap, err := BuildPut(id, nodeType, value)
+	edgeMap, err := common.Put(id, nodeType, value)
 	if err != nil {
 		return nil, err
 	}
 	return append(i, edgeMap), nil
 }
 
-func (i WriteItemsInput) AppendEdge(id string, value interface{}) (WriteItemsInput, error) {
-	edgeMap, err := AddEdge(id, value)
+func (i Operations) AppendEdge(id string, value interface{}) (Operations, error) {
+	edgeMap, err := common.Edge(id, value)
 	if err != nil {
 		return nil, err
 	}
 	return append(i, edgeMap), nil
 }
 
-func (i WriteItemsInput) AppendProp(id string, value interface{}) (WriteItemsInput, error) {
-	propMap, err := AddProp(id, value)
+func (i Operations) AppendProp(id string, value interface{}) (Operations, error) {
+	propMap, err := common.Prop(id, value)
 	if err != nil {
 		return nil, err
 	}
 	return append(i, propMap), nil
 }
 
-func (i WriteItemsInput) AppendRef(sourceId, targetId string) (WriteItemsInput, error) {
-	refMap, err := AddRef(sourceId, targetId)
+func (i Operations) AppendRef(sourceId, targetId string) (Operations, error) {
+	refMap, err := common.Ref(sourceId, targetId)
 	if err != nil {
 		return nil, err
 	}
 	return append(i, refMap), nil
 }
 
-type KeysInput []dynamo.Keyed
+type IDs []dynamo.Keyed
 
-func (i KeysInput) AppendKeys(keys Filter) KeysInput {
+func (i IDs) AppendKeys(keys dynamo.Keyed) IDs {
 	return append(i, keys)
 }
 
-type Filter struct {
-	Id       string
-	Type     string
+type ID struct {
+	Id   string
+	Type string
+}
+
+func (i ID) HashKey() interface{}  { return i.Id }
+func (i ID) RangeKey() interface{} { return i.Type }
+
+type Query struct {
+	ID
 	Operator Operator
 	Index    Index
 }
 
-func (k Filter) HashKey() interface{}  { return k.Id }
-func (k Filter) RangeKey() interface{} { return k.Type }
-func (k Filter) OperatorKey() Operator {
-	if len(k.Operator) == 0 {
+func (q Query) OperatorKey() Operator {
+	if len(q.Operator) == 0 {
 		return BeginsWith
 	}
-	return k.Operator
+	return q.Operator
 }
-func (k Filter) IndexKey() Index {
-	if len(k.Index) == 0 {
+func (q Query) IndexKey() Index {
+	if len(q.Index) == 0 {
 		return Default
 	}
-	return k.Index
+	return q.Index
 }
 
-func (k Filter) GetHashValue() (string, string) {
-	if k.Index == ByType {
-		return NodeType, k.Type
+func (q Query) GetHashSchema() (string, string) {
+	if q.Index == ByType {
+		return common.NodeType, q.Type
 	}
-	return NodeId, k.Id
+	return common.NodeId, q.Id
 }
 
-func (k Filter) GetRangeValues() (string, dynamo.Operator, string) {
-	if k.Index == ByType {
-		return NodeId, dynamo.Operator(k.OperatorKey()), k.Id
+func (q Query) GetRangeSchema() (string, dynamo.Operator, string) {
+	if q.Index == ByType {
+		return common.NodeId, dynamo.Operator(q.OperatorKey()), q.Id
 	}
-	return NodeType, dynamo.Operator(k.OperatorKey()), k.Type
+	return common.NodeType, dynamo.Operator(q.OperatorKey()), q.Type
 }

@@ -2,13 +2,18 @@ package node
 
 import (
 	"context"
+	"github.com/maxidelgado/dynagraph/internal/common"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/guregu/dynamo"
+	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
 	"github.com/maxidelgado/dynagraph/utils"
 )
 
-func New(ctx context.Context, id string, t dynamo.Table) Node {
+var (
+	newId = common.Id
+)
+
+func New(ctx context.Context, id string, t dynamoiface.Table) Node {
 	return node{
 		id:  id,
 		ctx: ctx,
@@ -22,23 +27,23 @@ type Node interface {
 	Edge(value interface{}) error
 	Prop(value interface{}) error
 	Ref(id string) error
-	Delete(filter utils.Filter) error
+	Delete(filter utils.ID) error
 }
 
 type node struct {
 	id    string
 	ntype string
-	t     dynamo.Table
+	t     dynamoiface.Table
 	ctx   context.Context
 }
 
 func (n node) Put(value interface{}) (string, error) {
-	n.ntype = utils.GetNodeType(value)
+	n.ntype = common.Type(value)
 	if n.id == "" {
-		n.id = utils.NewId(value)
+		n.id = newId(value)
 	}
 
-	nodeMap, err := utils.BuildPut(n.id, n.ntype, value)
+	nodeMap, err := common.Put(n.id, n.ntype, value)
 	if err != nil {
 		return "", err
 	}
@@ -51,18 +56,18 @@ func (n node) Put(value interface{}) (string, error) {
 }
 
 func (n node) Update(value interface{}) error {
-	n.ntype = utils.GetNodeType(value)
-	updateMap, err := utils.BuildUpdate(value)
+	n.ntype = common.Type(value)
+	updateMap, err := common.Update(value)
 	if err != nil {
 		return err
 	}
 
 	update := n.t.
-		Update(utils.NodeId, n.id).
-		Range(utils.NodeType, utils.NodeName+utils.Separator+n.ntype)
+		Update(common.NodeId, n.id).
+		Range(common.NodeType, common.NodeName+common.Separator+n.ntype)
 
 	for key, val := range updateMap {
-		if key == utils.NodeId {
+		if key == common.NodeId {
 			continue
 		}
 
@@ -83,7 +88,7 @@ func (n node) Update(value interface{}) error {
 }
 
 func (n node) Edge(value interface{}) error {
-	edgeMap, err := utils.AddEdge(n.id, value)
+	edgeMap, err := common.Edge(n.id, value)
 	if err != nil {
 		return err
 	}
@@ -92,7 +97,7 @@ func (n node) Edge(value interface{}) error {
 }
 
 func (n node) Prop(value interface{}) error {
-	propMap, err := utils.AddProp(n.id, value)
+	propMap, err := common.Prop(n.id, value)
 	if err != nil {
 		return err
 	}
@@ -101,7 +106,7 @@ func (n node) Prop(value interface{}) error {
 }
 
 func (n node) Ref(refId string) error {
-	refMap, err := utils.AddRef(n.id, refId)
+	refMap, err := common.Ref(n.id, refId)
 	if err != nil {
 		return err
 	}
@@ -109,9 +114,9 @@ func (n node) Ref(refId string) error {
 	return n.t.Put(refMap).RunWithContext(n.ctx)
 }
 
-func (n node) Delete(filter utils.Filter) error {
+func (n node) Delete(filter utils.ID) error {
 	return n.t.
-		Delete(utils.NodeId, filter.HashKey()).
-		Range(utils.NodeType, filter.RangeKey()).
+		Delete(common.NodeId, filter.HashKey()).
+		Range(common.NodeType, filter.RangeKey()).
 		RunWithContext(n.ctx)
 }

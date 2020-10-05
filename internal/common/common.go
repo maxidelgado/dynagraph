@@ -1,4 +1,4 @@
-package utils
+package common
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ const (
 	Separator = ":"
 )
 
-func BuildPut(id, ntype string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func Put(id, ntype string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	if id == "" {
 		return nil, errors.New("id is mandatory")
 	}
@@ -38,7 +38,7 @@ func BuildPut(id, ntype string, value interface{}) (map[string]*dynamodb.Attribu
 	return nodeMap, nil
 }
 
-func BuildUpdate(value interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func Update(value interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	avs, err := dynamo.MarshalItem(value)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func BuildUpdate(value interface{}) (map[string]*dynamodb.AttributeValue, error)
 	return avs, nil
 }
 
-func AddEdge(id string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func Edge(id string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	if id == "" {
 		return nil, errors.New("source node id is mandatory")
 	}
@@ -67,7 +67,7 @@ func AddEdge(id string, value interface{}) (map[string]*dynamodb.AttributeValue,
 	return edgeMap, nil
 }
 
-func AddProp(id string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func Prop(id string, value interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	if id == "" {
 		return nil, errors.New("source node id is mandatory")
 	}
@@ -77,7 +77,7 @@ func AddProp(id string, value interface{}) (map[string]*dynamodb.AttributeValue,
 		return nil, err
 	}
 
-	pName := GetNodeType(value)
+	pName := Type(value)
 
 	propMap[NodeId] = &dynamodb.AttributeValue{S: aws.String(id)}
 	propMap[NodeType] = &dynamodb.AttributeValue{S: aws.String(PropName + Separator + pName)}
@@ -85,7 +85,7 @@ func AddProp(id string, value interface{}) (map[string]*dynamodb.AttributeValue,
 	return propMap, nil
 }
 
-func AddRef(sourceId, targetId string) (map[string]*dynamodb.AttributeValue, error) {
+func Ref(sourceId, targetId string) (map[string]*dynamodb.AttributeValue, error) {
 	if sourceId == "" || targetId == "" {
 		return nil, errors.New("sourceId and targetId are mandatory")
 	}
@@ -96,11 +96,11 @@ func AddRef(sourceId, targetId string) (map[string]*dynamodb.AttributeValue, err
 	}, nil
 }
 
-func GetNodeType(value interface{}) string {
+func Type(value interface{}) string {
 	return strings.ToLower(structs.Name(value))
 }
 
-func NewId(value interface{}) string {
-	nodeType := GetNodeType(value)
+func Id(value interface{}) string {
+	nodeType := Type(value)
 	return fmt.Sprintf("%s:%s", nodeType, uuid.New().String())
 }

@@ -2,23 +2,81 @@ package batch
 
 import (
 	"context"
-	"github.com/guregu/dynamo"
-	"github.com/maxidelgado/dynagraph/utils"
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/guregu/dynamo"
+	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
+	"github.com/maxidelgado/dynagraph/utils"
 )
+
+type tMock struct {
+	dynamoiface.Table
+	batch dynamoiface.Batch
+}
+
+func (m tMock) Batch(hashAndRangeKeyName ...string) dynamoiface.Batch {
+	return m.batch
+}
+
+type bMock struct {
+	dynamoiface.Batch
+	batchWrite dynamoiface.BatchWrite
+	batchGet   dynamoiface.BatchGet
+}
+
+func (m bMock) Write() dynamoiface.BatchWrite {
+	return m.batchWrite
+}
+
+func (m bMock) Get(keys ...dynamo.Keyed) dynamoiface.BatchGet {
+	return m.batchGet
+}
+
+type bwMock struct {
+	dynamoiface.BatchWrite
+	err   error
+	wrote int
+}
+
+func (m bwMock) Put(items ...interface{}) dynamoiface.BatchWrite {
+	return m
+}
+
+func (m bwMock) Delete(keys ...dynamo.Keyed) dynamoiface.BatchWrite {
+	return m
+}
+
+func (m bwMock) RunWithContext(ctx aws.Context) (wrote int, err error) {
+	return m.wrote, m.err
+}
+
+type bgMock struct {
+	dynamoiface.BatchGet
+	err error
+}
+
+func (m bgMock) AllWithContext(ctx aws.Context, out interface{}) error {
+	return m.err
+}
 
 func TestNew(t *testing.T) {
 	type args struct {
 		ctx context.Context
-		t   dynamo.Table
+		t   dynamoiface.Table
 	}
 	tests := []struct {
 		name string
 		args args
 		want Batch
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success: batch client created",
+			args: args{},
+			want: batch{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -30,12 +88,13 @@ func TestNew(t *testing.T) {
 }
 
 func Test_batch_Delete(t *testing.T) {
+
 	type fields struct {
-		t   dynamo.Table
+		t   dynamoiface.Table
 		ctx context.Context
 	}
 	type args struct {
-		keys utils.KeysInput
+		keys utils.IDs
 	}
 	tests := []struct {
 		name    string
@@ -44,7 +103,30 @@ func Test_batch_Delete(t *testing.T) {
 		want    int
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success: one node deleted",
+			fields: fields{
+				t:   tMock{batch: bMock{batchWrite: bwMock{err: nil, wrote: 1}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				keys: utils.IDs{},
+			},
+			want:    1,
+			wantErr: false,
+		},
+		{
+			name: "fail: delete error",
+			fields: fields{
+				t:   tMock{batch: bMock{batchWrite: bwMock{err: errors.New("error"), wrote: 0}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				keys: utils.IDs{},
+			},
+			want:    0,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -66,12 +148,12 @@ func Test_batch_Delete(t *testing.T) {
 
 func Test_batch_Get(t *testing.T) {
 	type fields struct {
-		t   dynamo.Table
+		t   dynamoiface.Table
 		ctx context.Context
 	}
 	type args struct {
 		out  interface{}
-		keys utils.KeysInput
+		keys utils.IDs
 	}
 	tests := []struct {
 		name    string
@@ -79,7 +161,30 @@ func Test_batch_Get(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success: get items",
+			fields: fields{
+				t:   tMock{batch: bMock{batchGet: bgMock{err: nil}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				out:  &struct{ Id string }{},
+				keys: utils.IDs{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "fail: get items error",
+			fields: fields{
+				t:   tMock{batch: bMock{batchGet: bgMock{err: errors.New("error")}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				out:  &struct{ Id string }{},
+				keys: utils.IDs{},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,11 +201,11 @@ func Test_batch_Get(t *testing.T) {
 
 func Test_batch_Put(t *testing.T) {
 	type fields struct {
-		t   dynamo.Table
+		t   dynamoiface.Table
 		ctx context.Context
 	}
 	type args struct {
-		inputs utils.WriteItemsInput
+		inputs utils.Operations
 	}
 	tests := []struct {
 		name    string
@@ -109,7 +214,30 @@ func Test_batch_Put(t *testing.T) {
 		want    int
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "success: items created",
+			fields: fields{
+				t:   tMock{batch: bMock{batchWrite: bwMock{err: nil, wrote: 1}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				inputs: utils.Operations{},
+			},
+			want:    1,
+			wantErr: false,
+		},
+		{
+			name: "fail: create items error",
+			fields: fields{
+				t:   tMock{batch: bMock{batchWrite: bwMock{err: errors.New("error"), wrote: 0}}},
+				ctx: context.Background(),
+			},
+			args: args{
+				inputs: utils.Operations{},
+			},
+			want:    0,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -127,4 +255,10 @@ func Test_batch_Put(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFechas(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+
+	})
 }

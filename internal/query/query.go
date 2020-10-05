@@ -2,34 +2,34 @@ package query
 
 import (
 	"context"
+	"github.com/maxidelgado/dynagraph/internal/common"
+	"github.com/maxidelgado/dynagraph/internal/dynamoiface"
 
 	"github.com/guregu/dynamo"
 	"github.com/maxidelgado/dynagraph/utils"
 )
 
-func New(ctx context.Context, t dynamo.Table, f utils.Filter) Query {
+func New(ctx context.Context, t dynamoiface.Table) Query {
 	return query{
-		f:   f,
 		t:   t,
 		ctx: ctx,
 	}
 }
 
 type Query interface {
-	One(out interface{}) error
-	All(out interface{}) error
+	One(id utils.ID, out interface{}) error
+	All(query utils.Query, out interface{}) error
 }
 
 type query struct {
-	f   utils.Filter
-	t   dynamo.Table
+	t   dynamoiface.Table
 	ctx context.Context
 }
 
-func (f query) One(out interface{}) error {
+func (f query) One(id utils.ID, out interface{}) error {
 	err := f.t.
-		Get(f.f.GetHashValue()).
-		Range(utils.NodeType, dynamo.Equal, f.f.Type).
+		Get(common.NodeId, id.HashKey()).
+		Range(common.NodeType, dynamo.Equal, id.RangeKey()).
 		OneWithContext(f.ctx, out)
 	if err != nil {
 		return err
@@ -38,21 +38,21 @@ func (f query) One(out interface{}) error {
 	return nil
 }
 
-func (f query) All(out interface{}) error {
+func (f query) All(query utils.Query, out interface{}) error {
 	var err error
 
-	get := f.t.Get(f.f.GetHashValue())
+	get := f.t.Get(common.NodeId, query.HashKey())
 
-	if f.f.Index == utils.ByType {
-		get = get.Index(string(f.f.Index))
+	if query.Index == utils.ByType {
+		get = get.Index(string(query.Index))
 	}
 
-	if f.f.OperatorKey() == utils.Noop {
+	if query.OperatorKey() == utils.Noop {
 		err = get.
 			AllWithContext(f.ctx, out)
 	} else {
 		err = get.
-			Range(f.f.GetRangeValues()).
+			Range(common.NodeType, dynamo.Operator(query.Operator), query.RangeKey()).
 			AllWithContext(f.ctx, out)
 	}
 

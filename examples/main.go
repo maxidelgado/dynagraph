@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/maxidelgado/dynagraph/internal/common"
 	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -42,9 +43,9 @@ func main() {
 
 	// create order tx
 	o := ExampleOrder{}
-	o.Id = utils.NewId(o)
+	o.Id = common.Id(o)
 
-	inputs := utils.WriteItemsInput{}
+	inputs := utils.Operations{}
 	inputs, _ = inputs.AppendNode(o.Id, o)
 	inputs, _ = inputs.AppendEdge(o.Id, u)
 	inputs, _ = inputs.AppendEdge(o.Id, p)
@@ -64,24 +65,24 @@ func main() {
 		Id   string
 		Type string
 	}
-	err = c.Query(ctx, utils.Filter{Id: o.Id, Type: "edge"}).All(&edges)
+	err = c.Query(ctx).All(utils.Query{ID: utils.ID{Id: o.Id, Type: "edge"}}, &edges)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// delete example by using transactions
-	keys := utils.KeysInput{}
+	keys := utils.IDs{}
 	for _, edge := range edges {
-		keys = append(keys, utils.Filter{Id: edge.Id, Type: edge.Type})
+		keys = append(keys, utils.ID{Id: edge.Id, Type: edge.Type})
 	}
-	keys = keys.AppendKeys(utils.Filter{Id: p.Id, Type: "node:exampleproduct"})
-	keys = keys.AppendKeys(utils.Filter{Id: o.Id, Type: "prop:exampleorder"})
+	keys = keys.AppendKeys(utils.ID{Id: p.Id, Type: "node:exampleproduct"})
+	keys = keys.AppendKeys(utils.ID{Id: o.Id, Type: "prop:exampleorder"})
 	err = c.Transaction(ctx).Delete(keys).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 	// delete individual node
-	err = c.Node(ctx).Delete(utils.Filter{Id: u.Id, Type: "node:exampleuser"})
+	err = c.Node(ctx).Delete(utils.ID{Id: u.Id, Type: "node:exampleuser"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,11 +106,11 @@ func main() {
 		err = c.Node(u.Id).Ref(p.Id) // OK
 		err = c.Node("no_existe").Ref(p.Id) // error
 
-		err = c.Node().Delete(dynagraph.Filter{"1234", "untipo"}) // OK
-		err = c.Node().Delete(dynagraph.Filter{"1234", ""}) // error
-		err = c.Node().Delete(dynagraph.Filter{}) // error
+		err = c.Node().Delete(dynagraph.Query{"1234", "untipo"}) // OK
+		err = c.Node().Delete(dynagraph.Query{"1234", ""}) // error
+		err = c.Node().Delete(dynagraph.Query{}) // error
 
-		err = c.Query(dynagraph.Filter{"1234", "untipo"}).One(&result)
+		err = c.Query(dynagraph.Query{"1234", "untipo"}).One(&result)
 	*/
 }
 
