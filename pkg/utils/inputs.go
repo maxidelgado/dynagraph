@@ -27,7 +27,7 @@ type Index string
 
 const (
 	Default Index = "default"
-	ByType  Index = "by type"
+	ByType  Index = "ByType"
 )
 
 type Operations []interface{}

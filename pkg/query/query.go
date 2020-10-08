@@ -41,7 +41,7 @@ func (f query) One(id utils.ID, out interface{}) error {
 func (f query) All(query utils.Query, out interface{}) error {
 	var err error
 
-	get := f.t.Get(common.NodeId, query.HashKey())
+	get := f.t.Get(query.GetHashSchema())
 
 	if query.Index == utils.ByType {
 		get = get.Index(string(query.Index))
@@ -52,13 +52,9 @@ func (f query) All(query utils.Query, out interface{}) error {
 			AllWithContext(f.ctx, out)
 	} else {
 		err = get.
-			Range(common.NodeType, dynamo.Operator(query.Operator), query.RangeKey()).
+			Range(query.GetRangeSchema()).
 			AllWithContext(f.ctx, out)
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

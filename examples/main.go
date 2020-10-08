@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/maxidelgado/dynagraph"
 	"github.com/maxidelgado/dynagraph/pkg/utils"
 )
@@ -16,21 +17,17 @@ func init() {
 	os.Setenv("AWS_PROFILE", "astrocode")
 }
 
-type A struct {
-	Id    string
-	Value string
-	B     B   `dynamo:"-"`
-	Cs    []C `dynamo:"-"`
+type Person struct {
+	Id   string
+	Name string
+
+	Addresses []Address `dynamo:"-"`
 }
 
-type B struct {
-	Id    string
-	Value string
-}
-
-type C struct {
-	Id    string
-	Value string
+type Address struct {
+	Id     string
+	Street string
+	Number int
 }
 
 func main() {
@@ -41,51 +38,68 @@ func main() {
 		ctx  = context.Background()
 	)
 
-	// setup nodes
-	nodeA := A{
-		Id:    "a:id",
-		Value: "some field value",
+	foo := Person{
+		Name: "foo",
 	}
-	nodeB := B{
-		Id:    "b:id",
-		Value: "some field value",
+
+	bar := Person{
+		Name: "bar",
 	}
-	nodeC := C{
-		Id:    "c:id",
-		Value: "some field value",
+
+	addr := Address{
+		Street: "fake street",
+		Number: 123,
 	}
-	nodeA.B = nodeB
-	nodeA.Cs = append(nodeA.Cs, nodeC)
 
-	// create source node A
-	c.Node(ctx, nodeA.Id).Put(nodeA)
+	addr2 := Address{
+		Street: "another fake street",
+		Number: 456,
+	}
 
-	// create child node B (one to one)
-	c.Node(ctx, nodeA.Id).Prop(nodeB)
+	// create persons
+	foo.Id, _ = c.Node(ctx).Put(foo)
+	bar.Id, _ = c.Node(ctx).Put(bar)
 
-	// create nodeA <-> nodeC edge (one/many to many)
-	c.Node(ctx, nodeA.Id).Edge(nodeC)
+	// create addressesByPerson
+	addr.Id, _ = c.Node(ctx).Put(addr)
+	addr2.Id, _ = c.Node(ctx).Put(addr2)
 
-	// update node A
-	c.Node(ctx, nodeA.Id).Update(A{Value: "updated value"})
+	// add edges between them
+	c.Node(ctx, foo.Id).Edge(addr)
+	c.Node(ctx, foo.Id).Edge(addr2)
+	c.Node(ctx, bar.Id).Edge(addr)
 
-	// get nodeA
-	var resultNodeA A
-	c.Query(ctx).One(utils.ID{Id: nodeA.Id, Type: "node:a"}, &resultNodeA)
+	// add reverse edges
+	c.Node(ctx, addr.Id).Edge(foo)
+	c.Node(ctx, addr.Id).Edge(bar)
+	c.Node(ctx, addr2.Id).Edge(foo)
 
-	// get nodeA property B
-	c.Query(ctx).One(utils.ID{Id: nodeA.Id, Type: "prop:b"}, &resultNodeA.B)
+	// get all saved persons
+	var allPersons []Person
+	c.Query(ctx).All(utils.Query{
+		ID:    utils.ID{Id: "person", Type: "node:person"},
+		Index: utils.ByType,
+	}, &allPersons)
 
-	// get nodeA edges
-	c.Query(ctx).All(utils.Query{ID: utils.ID{Id: nodeA.Id, Type: "edge"}}, &resultNodeA.Cs)
+	// get persons by address
+	var personsByAddress []Person
+	c.Query(ctx).All(utils.Query{
+		ID: utils.ID{Id: addr.Id, Type: "edge:person:"},
+	}, &personsByAddress)
 
-	// delete nodes
-	nodeId := utils.ID{Id: nodeA.Id, Type: "node:a"}
-	propId := utils.ID{Id: nodeA.Id, Type: "prop:b"}
-	edgeId := utils.ID{Id: nodeA.Id, Type: "edge:c:id"}
-	c.Node(ctx).Delete(nodeId)
-	c.Node(ctx).Delete(propId)
-	c.Node(ctx).Delete(edgeId)
+	// get addressesByPerson by person
+	c.Query(ctx).All(utils.Query{
+		ID: utils.ID{Id: foo.Id, Type: "edge:address:"},
+	}, &foo.Addresses)
+
+	// get one person
+	var onePerson Person
+	c.Query(ctx).One(utils.ID{Id: bar.Id, Type: "node:person"}, &onePerson)
+
+	spew.Dump(allPersons)
+	spew.Dump(personsByAddress)
+	spew.Dump(foo.Addresses)
+	spew.Dump(onePerson)
 }
 
 func connectAWS(region string) *session.Session {
