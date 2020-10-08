@@ -14,7 +14,7 @@ import (
 
 func init() {
 	os.Setenv("AWS_REGION", "us-east-1")
-	os.Setenv("AWS_PROFILE", "astrocode")
+	os.Setenv("AWS_PROFILE", "YOUR_AWS_PROFILE")
 }
 
 type Person struct {
@@ -34,7 +34,7 @@ func main() {
 	var (
 		sess = connectAWS("us-east-1")
 		db   = dynamodb.New(sess)
-		c, _ = dynagraph.New(db, "astrocode")
+		c, _ = dynagraph.New(db, "YOUR_TABLE_NAME")
 		ctx  = context.Background()
 	)
 
