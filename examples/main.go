@@ -97,9 +97,58 @@ func main() {
 	c.Query(ctx).One(utils.ID{Id: bar.Id, Type: "node:person"}, &onePerson)
 
 	spew.Dump(allPersons)
+	/*
+		 [
+			 {
+			  Id: "person:73b1b881-be62-41d8-a3da-2ac5a6f25d6f",
+			  Name: "bar",
+			  Addresses: <nil>
+			 },
+			 {
+			  Id: "person:7a29aaf9-2a28-4dcf-9f6b-2f50ffa9a5c7",
+			  Name: "foo",
+			  Addresses: <nil>
+			 }
+		]
+	*/
 	spew.Dump(personsByAddress)
+	/*
+		[
+			{
+			  Id: "address:fa547273-e265-4a47-a9ef-39c7538e4be8",
+			  Name: "bar",
+			  Addresses: <nil>
+			 },
+			 {
+			  Id: "address:fa547273-e265-4a47-a9ef-39c7538e4be8",
+			  Name: "foo",
+			  Addresses: <nil>
+			 }
+		]
+	*/
 	spew.Dump(foo.Addresses)
+	/*
+		[
+			 {
+			  Id: "person:7a29aaf9-2a28-4dcf-9f6b-2f50ffa9a5c7",
+			  Street: "another fake street",
+			  Number: 456
+			 },
+			 {
+			  Id: "person:7a29aaf9-2a28-4dcf-9f6b-2f50ffa9a5c7",
+			  Street: "fake street",
+			  Number: 123
+			 }
+		]
+	*/
 	spew.Dump(onePerson)
+	/*
+		{
+		 Id: "person:73b1b881-be62-41d8-a3da-2ac5a6f25d6f",
+		 Name: "bar",
+		 Addresses: <nil>
+		}
+	*/
 }
 
 func connectAWS(region string) *session.Session {
